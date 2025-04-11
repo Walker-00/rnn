@@ -57,4 +57,6 @@ fn init_params() -> [NDArray; 4] {
     [w1, b1, w2, b2]
 }
 
-fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) {}
+fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) {
+    let z1 = w1.dot(&x) + b1;
+}

@@ -82,7 +82,8 @@ fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) 
     [z1, a1, z2, a2]
 }
 
-fn one_hot(y: NDArray) -> Array2<f64> {
+fn one_hot(y: &NDArray) -> NDArray {
+    let y = y.clone();
     let max = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
     let num_samples = y.len();
     let num_classes = *max as usize + 1;
@@ -105,7 +106,7 @@ fn one_hot(y: NDArray) -> Array2<f64> {
         one_hot_y[[i, *class_idx as usize]] = 1.;
     }
 
-    one_hot_y
+    one_hot_y.t().to_owned()
 }
 
 fn back_prop(z1: NDArray, a1: NDArray, z2: NDArray, a2: NDArray, w2: NDArray, y: NDArray) {}

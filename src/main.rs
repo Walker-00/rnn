@@ -77,4 +77,10 @@ fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) 
     [z1, a1, z2, a2]
 }
 
+fn one_hot(y: NDArray) {
+    let max = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+    let one_hot_y = Array2::zeros((&(y.len() as f64), max + 1.).into());
+    one_hot_y[ndarray::range(, b, step)]
+}
+
 fn back_prop(z1: NDArray, a1: NDArray, z2: NDArray, a2: NDArray, w2: NDArray, y: NDArray) {}

@@ -1,7 +1,7 @@
 use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, s};
 use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, seq::SliceRandom};
-use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelBridge};
 
 type NDArray = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 
@@ -58,17 +58,23 @@ fn init_params() -> [NDArray; 4] {
     [w1, b1, w2, b2]
 }
 
-fn relu(mut z: NDArray) -> NDArray {
+fn relu(z: &NDArray) -> NDArray {
+    let mut z = z.clone();
     z.par_mapv_inplace(|v| v.max(0.0));
     z
 }
 
-fn softmax(z: NDArray) -> NDArray {
+fn softmax(z: &NDArray) -> NDArray {
     z.exp() / z.exp().sum()
 }
 
-fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) {
+fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) -> [NDArray; 4] {
     let z1 = w1.dot(&x) + b1;
-    let a1 = relu(z1);
+    let a1 = relu(&z1);
     let z2 = w2.dot(&a1) + b2;
+    let a2 = softmax(&z2);
+
+    [z1, a1, z2, a2]
 }
+
+fn back_prop(z1: NDArray, a1: NDArray, z2: NDArray, a2: NDArray, w2: NDArray, y: NDArray) {}

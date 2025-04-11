@@ -63,6 +63,10 @@ fn relu(mut z: NDArray) -> NDArray {
     z
 }
 
+fn softmax(z: NDArray) -> NDArray {
+    z.exp() / z.exp().sum()
+}
+
 fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) {
     let z1 = w1.dot(&x) + b1;
     let a1 = relu(z1);

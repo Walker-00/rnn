@@ -21,7 +21,11 @@ fn main() {
         &rows.iter().map(|row| row.view()).collect::<Vec<_>>(),
     )
     .unwrap();
-    let data_dev_slice = data.slice(s![0..=1000, ..]).t();
+    let data_dev_slice = data.slice(s![0..=1000, ..]);
+    let data_dev = data_dev_slice.t();
+
+    let y_dev = data_dev.first().unwrap();
+
     // let data_dev = data_dev_slice.t();
     // let y_dev = data_dev[0].clone();
 }

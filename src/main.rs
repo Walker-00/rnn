@@ -46,4 +46,7 @@ fn init_params() {
 
     let w1 = Array2::from_shape_fn((10, 784), |_| rng.sample(dist)) - 0.5;
     let b1 = Array2::from_shape_fn((10, 1), |_| rng.sample(dist)) - 0.5;
+
+    let w2 = Array2::from_shape_fn((10, 10), |_| rng.sample(dist)) - 0.5;
+    let b2 = Array2::from_shape_fn((10, 1), |_| rng.sample(dist)) - 0.5;
 }

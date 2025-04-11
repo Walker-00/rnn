@@ -83,7 +83,6 @@ fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) 
 }
 
 fn one_hot(y: &NDArray) -> NDArray {
-    let y = y.clone();
     let max = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
     let num_samples = y.len();
     let num_classes = *max as usize + 1;

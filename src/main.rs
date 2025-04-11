@@ -36,10 +36,7 @@ fn main() {
     let x_train = x_train_slice.to_owned() / 255.0;
 
     println!("{y_train}");
-    println!("{:?}", x_train.slice(s![0, ..]).dim());
-
-    // let x_dev = x_dev_slice / 255.;
-
-    // let data_dev = data_dev_slice.t();
-    // let y_dev = data_dev[0].clone();
+    println!("{:?}", x_train.slice(s![.., 0]).dim());
 }
+
+fn init_params() {}

@@ -1,7 +1,12 @@
+use std::{f64, usize};
+
 use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, s};
-use polars::{io::SerReader, prelude::*};
+use polars::{frame::row, io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, seq::SliceRandom};
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelBridge};
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator,
+    IntoParallelRefMutIterator, ParallelBridge, ParallelIterator,
+};
 
 type NDArray = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 
@@ -77,9 +82,30 @@ fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) 
     [z1, a1, z2, a2]
 }
 
-fn one_hot(y: NDArray) {
+fn one_hot(y: NDArray) -> Array2<f64> {
     let max = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-    let one_hot_y = Array2::zeros((&(y.len() as f64), max + 1.).into());
+    let num_samples = y.len();
+    let num_classes = *max as usize + 1;
+    let mut one_hot_y = Array2::<f64>::zeros((num_samples, num_classes));
+
+    // let mut one_hot_y = Array2::<f64>::zeros(((y.len() as f64), max + 1.));
+
+    // let rows = one_hot_y.iter().cloned().enumerate().collect::<Vec<_>>();
+
+    // rows.into_par_iter().for_each(|(i, class_idx)| {
+    //     one_hot_y[[i, class_idx as usize]] = 1.;
+    // });
+
+    // rows.par_iter_mut().enumerate().for_each(|(i, row)| {
+    //     let class_idx = y[i as f64];
+    //     row[class_idx] = 1.
+    // });
+
+    for (i, class_idx) in y.iter().enumerate() {
+        one_hot_y[[i, *class_idx as usize]] = 1.;
+    }
+
+    one_hot_y
 }
 
 fn back_prop(z1: NDArray, a1: NDArray, z2: NDArray, a2: NDArray, w2: NDArray, y: NDArray) {}

@@ -10,8 +10,9 @@ fn main() {
         .unwrap()
         .finish()
         .unwrap();
-    let mut data = csv_data.to_ndarray::<Float64Type>(IndexOrder::C).unwrap();
-    println!("{:#?}", data.shape());
+    let data = csv_data.to_ndarray::<Float64Type>(IndexOrder::C).unwrap();
+    let data_shapes = data.shape();
+    let (m, n) = (data_shapes[0], data_shapes[1]);
     let mut rows: Vec<_> = data.axis_iter(Axis(0)).collect();
     rows.shuffle(&mut rng);
 

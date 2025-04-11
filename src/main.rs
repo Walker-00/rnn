@@ -58,10 +58,13 @@ fn init_params() -> [NDArray; 4] {
     [w1, b1, w2, b2]
 }
 
-fn relu(mut z: NDArray) {
+fn relu(mut z: NDArray) -> NDArray {
     z.par_mapv_inplace(|v| v.max(0.0));
+    z
 }
 
 fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) {
     let z1 = w1.dot(&x) + b1;
+    let a1 = relu(z1);
+    let z2 = w2.dot(&a1) + b2;
 }

@@ -1,6 +1,10 @@
-use ndarray::{Array2, Axis, s};
+use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, s};
 use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, seq::SliceRandom};
+
+type NDArray = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
+
+// type Wnb = [(NDArray, NDArray); 2];
 
 fn main() {
     let mut rng = rand::rng();
@@ -39,7 +43,7 @@ fn main() {
     println!("{:?}", x_train.slice(s![.., 0]).dim());
 }
 
-fn init_params() {
+fn init_params() -> [NDArray; 4] {
     let mut rng = rand::rng();
 
     let dist = Uniform::new(0., 1.).unwrap();
@@ -49,4 +53,8 @@ fn init_params() {
 
     let w2 = Array2::from_shape_fn((10, 10), |_| rng.sample(dist)) - 0.5;
     let b2 = Array2::from_shape_fn((10, 1), |_| rng.sample(dist)) - 0.5;
+
+    [w1, b1, w2, b2]
 }
+
+fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) {}

@@ -69,6 +69,8 @@ fn relu(z: &NDArray) -> NDArray {
     z
 }
 
+fn deriv_relvu() {}
+
 fn softmax(z: &NDArray) -> NDArray {
     z.exp() / z.exp().sum()
 }
@@ -108,4 +110,11 @@ fn one_hot(y: &NDArray) -> NDArray {
     one_hot_y.t().to_owned()
 }
 
-fn back_prop(z1: NDArray, a1: NDArray, z2: NDArray, a2: NDArray, w2: NDArray, y: NDArray) {}
+fn back_prop(z1: NDArray, a1: NDArray, z2: NDArray, a2: NDArray, w2: NDArray, y: NDArray) {
+    let m = y.len();
+    let one_hot_y = one_hot(&y);
+    let dz2 = a2 - one_hot_y;
+    let dw2 = 1. / m as f64 * dz2.dot(&a1.t());
+    let db2 = 1. / m as f64 * dz2.sum_axis(Axis(2));
+    let dz1 = w2.t().dot(&dz2);
+}

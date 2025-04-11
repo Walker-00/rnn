@@ -1,6 +1,6 @@
-use ndarray::{Axis, s};
+use ndarray::{Array2, Axis, s};
 use polars::{io::SerReader, prelude::*};
-use rand::seq::SliceRandom;
+use rand::{Rng, distr::Uniform, seq::SliceRandom};
 
 fn main() {
     let mut rng = rand::rng();
@@ -39,4 +39,11 @@ fn main() {
     println!("{:?}", x_train.slice(s![.., 0]).dim());
 }
 
-fn init_params() {}
+fn init_params() {
+    let mut rng = rand::rng();
+
+    let dist = Uniform::new(0., 1.).unwrap();
+
+    let w1 = Array2::from_shape_fn((10, 784), |_| rng.sample(dist)) - 0.5;
+    let b1 = Array2::from_shape_fn((10, 1), |_| rng.sample(dist)) - 0.5;
+}

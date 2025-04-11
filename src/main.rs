@@ -24,7 +24,8 @@ fn main() {
     let data_dev_slice = data.slice(s![0..=1000, ..]);
     let data_dev = data_dev_slice.t();
 
-    let y_dev = data_dev.first().unwrap();
+    let y_dev = data_dev.slice(s![0, ..]);
+    let x_dev = data_dev.slice(s![1..n, ..]);
 
     // let data_dev = data_dev_slice.t();
     // let y_dev = data_dev[0].clone();

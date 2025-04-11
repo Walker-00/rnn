@@ -69,7 +69,9 @@ fn relu(z: &NDArray) -> NDArray {
     z
 }
 
-fn deriv_relvu() {}
+fn deriv_relvu(z: &NDArray) -> NDArray {
+    z.mapv(|v| if v > 0. { 1. } else { 0. })
+}
 
 fn softmax(z: &NDArray) -> NDArray {
     z.exp() / z.exp().sum()
@@ -110,11 +112,27 @@ fn one_hot(y: &NDArray) -> NDArray {
     one_hot_y.t().to_owned()
 }
 
-fn back_prop(z1: NDArray, a1: NDArray, z2: NDArray, a2: NDArray, w2: NDArray, y: NDArray) {
+fn back_prop(
+    z1: NDArray,
+    a1: NDArray,
+    // z2: NDArray,
+    a2: NDArray,
+    w2: NDArray,
+    x: NDArray,
+    y: NDArray,
+) -> [NDArray; 4] {
     let m = y.len();
     let one_hot_y = one_hot(&y);
+
     let dz2 = a2 - one_hot_y;
     let dw2 = 1. / m as f64 * dz2.dot(&a1.t());
-    let db2 = 1. / m as f64 * dz2.sum_axis(Axis(2));
-    let dz1 = w2.t().dot(&dz2);
+    // let db2 = 1. / m as f64 * dz2.sum_axis(Axis(2));
+    let db2 = dz2.sum_axis(Axis(1)).insert_axis(Axis(1)) * (1. / m as f64);
+
+    let dz1 = w2.t().dot(&dz2) * deriv_relvu(&z1);
+    let dw1 = 1. / m as f64 * dz1.dot(&x.t());
+    // let db1 = 1. / m as f64 * dz1.sum_axis(Axis(2));
+    let db1 = dz1.sum_axis(Axis(1)).insert_axis(Axis(1)) * (1. / m as f64);
+
+    [dw1, db1, dw2, db2]
 }

@@ -2,7 +2,6 @@ use ndarray::{Axis, s};
 use polars::{io::SerReader, prelude::*};
 use rand::seq::SliceRandom;
 
-#[allow(unused)]
 fn main() {
     let mut rng = rand::rng();
     let csv_data = CsvReadOptions::default()
@@ -27,14 +26,17 @@ fn main() {
 
     let y_dev = data_dev.slice(s![0, ..]);
     let x_dev_slice = data_dev.slice(s![1..n, ..]);
-
-    println!("{m}, {n}");
+    let x_dev = x_dev_slice.to_owned() / 255.0;
 
     let data_train_slice = data.slice(s![1000..m, ..]);
-    let data_train = data_dev_slice.t();
+    let data_train = data_train_slice.t();
 
     let y_train = data_train.slice(s![0, ..]);
     let x_train_slice = data_train.slice(s![1..n, ..]);
+    let x_train = x_train_slice.to_owned() / 255.0;
+
+    println!("{y_train}");
+    println!("{:?}", x_train.slice(s![0, ..]).dim());
 
     // let x_dev = x_dev_slice / 255.;
 

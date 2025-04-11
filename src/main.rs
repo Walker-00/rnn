@@ -1,6 +1,7 @@
 use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, s};
 use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, seq::SliceRandom};
+use rayon::iter::IntoParallelRefIterator;
 
 type NDArray = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 
@@ -55,6 +56,10 @@ fn init_params() -> [NDArray; 4] {
     let b2 = Array2::from_shape_fn((10, 1), |_| rng.sample(dist)) - 0.5;
 
     [w1, b1, w2, b2]
+}
+
+fn relu(mut z: NDArray) {
+    z.par_mapv_inplace(|v| v.max(0.0));
 }
 
 fn forward_prop(w1: NDArray, b1: NDArray, w2: NDArray, b2: NDArray, x: NDArray) {

@@ -11,6 +11,7 @@ fn main() {
         .finish()
         .unwrap();
     let data = csv_data.to_ndarray::<Float64Type>(IndexOrder::C).unwrap();
+    // data.slice();
     let (m, n) = data.dim();
     let mut rows: Vec<_> = data.axis_iter(Axis(0)).collect();
     rows.shuffle(&mut rng);
@@ -20,7 +21,7 @@ fn main() {
         &rows.iter().map(|row| row.view()).collect::<Vec<_>>(),
     )
     .unwrap();
-    let data_dev_slice = data.slice(s![0..=1000]);
+    let data_dev_slice = data.slice(s![0..=1000, ..]).t();
     // let data_dev = data_dev_slice.t();
     // let y_dev = data_dev[0].clone();
 }

@@ -136,3 +136,24 @@ fn back_prop(
 
     [dw1, db1, dw2, db2]
 }
+
+#[allow(clippy::too_many_arguments)]
+fn update_params(
+    w1: NDArray,
+    b1: NDArray,
+    w2: NDArray,
+    b2: NDArray,
+    dw1: NDArray,
+    db1: NDArray,
+    dw2: NDArray,
+    db2: NDArray,
+    alpha: NDArray,
+) -> [NDArray; 4] {
+    let w1 = w1 - &alpha * dw1;
+    let b1 = b1 - &alpha * db1;
+
+    let w2 = w2 - &alpha * dw2;
+    let b2 = b2 - &alpha * db2;
+
+    [w1, b1, w2, b2]
+}

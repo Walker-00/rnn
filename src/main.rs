@@ -1,5 +1,6 @@
 use std::{f64, iter::zip};
 
+use clap::Parser;
 use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, s};
 use plotters::prelude::*;
 use polars::{io::SerReader, prelude::*};
@@ -8,10 +9,27 @@ use rand::{Rng, distr::Uniform, random, seq::SliceRandom};
 type Array2d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 type Array1d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>>;
 
-const HIDDEN_SIZE: usize = 128;
-const ITERS: u32 = 500;
+#[derive(Parser, Debug)]
+struct Args {
+    /// Set how much iteration to train
+    #[arg(short, long)]
+    iters: u32,
+
+    /// Set neurons par hidden layer
+    #[arg(short, long)]
+    neurons: usize,
+
+    /// Set how many time to test the trained neural network
+    #[arg(short, long)]
+    test_prediction: usize,
+
+    /// Set the Learning rate
+    #[arg(short, long)]
+    alpha: f64,
+}
 
 fn main() {
+    let args = Args::parse();
     let mut rng = rand::rng();
     let csv_data = CsvReadOptions::default()
         .with_has_header(true)
@@ -46,14 +64,20 @@ fn main() {
     println!("{y_train}");
     println!("{:?}", x_train.slice(s![.., 0]).dim());
 
-    let (w1, b1, w2, b2) =
-        gradient_descent(x_train.to_owned(), y_train.to_owned(), ITERS, 0.1).into();
+    let (w1, b1, w2, b2) = gradient_descent(
+        x_train.to_owned(),
+        y_train.to_owned(),
+        args.iters,
+        args.alpha,
+        args.neurons,
+    )
+    .into();
 
-    for _ in 0..100 {
+    for _ in 0..args.test_prediction {
         test_prediction(
             random::<u8>() as usize,
-            &x_train,
-            &y_train.to_owned(),
+            &x_dev,
+            &y_dev.to_owned(),
             &w1,
             &b1,
             &w2,
@@ -61,22 +85,22 @@ fn main() {
         );
     }
 
-    let dev_predictions = make_predictions(&x_dev, &w1, &b1, &w2, &b2);
-    println!(
-        "Un Tested Data Accuracy: {}",
-        get_accuracy(dev_predictions, &y_dev.to_owned())
-    );
+    // let dev_predictions = make_predictions(&x_dev, &w1, &b1, &w2, &b2);
+    // println!(
+    //     "Un Tested Data Accuracy: {}",
+    //     get_accuracy(dev_predictions, &y_dev.to_owned())
+    // );
 }
 
-fn init_params() -> [Array2d; 4] {
+fn init_params(neurons: usize) -> [Array2d; 4] {
     let mut rng = rand::rng();
 
     let dist = Uniform::new(0., 1.).unwrap();
 
-    let w1 = Array2::from_shape_fn((HIDDEN_SIZE, 784), |_| rng.sample(dist)) - 0.5;
-    let b1 = Array2::from_shape_fn((HIDDEN_SIZE, 1), |_| rng.sample(dist)) - 0.5;
+    let w1 = Array2::from_shape_fn((neurons, 784), |_| rng.sample(dist)) - 0.5;
+    let b1 = Array2::from_shape_fn((neurons, 1), |_| rng.sample(dist)) - 0.5;
 
-    let w2 = Array2::from_shape_fn((10, HIDDEN_SIZE), |_| rng.sample(dist)) - 0.5;
+    let w2 = Array2::from_shape_fn((10, neurons), |_| rng.sample(dist)) - 0.5;
     let b2 = Array2::from_shape_fn((10, 1), |_| rng.sample(dist)) - 0.5;
 
     [w1, b1, w2, b2]
@@ -206,8 +230,14 @@ fn get_accuracy(predictions: Vec<usize>, y: &Array1d) -> f64 {
     correct as f64 / y.len_of(Axis(0)) as f64
 }
 
-fn gradient_descent(x: Array2d, y: Array1d, iters: u32, alpha: f64) -> [Array2d; 4] {
-    let (mut w1, mut b1, mut w2, mut b2) = init_params().into();
+fn gradient_descent(
+    x: Array2d,
+    y: Array1d,
+    iters: u32,
+    alpha: f64,
+    neurons: usize,
+) -> [Array2d; 4] {
+    let (mut w1, mut b1, mut w2, mut b2) = init_params(neurons).into();
 
     for i in 0..iters {
         let (z1, a1, _z2, a2) = forward_prop(&w1, &b1, &w2, &b2, &x).into();

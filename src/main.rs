@@ -7,7 +7,7 @@ use rand::{Rng, distr::Uniform, seq::SliceRandom};
 type Array2d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 type Array1d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>>;
 
-const HIDDEN_SIZE: usize = 128;
+const HIDDEN_SIZE: usize = 200;
 
 // type Wnb = [(Array2d, Array2d); 2];
 
@@ -54,7 +54,7 @@ fn main() {
     println!("{y_train}");
     println!("{:?}", x_train.slice(s![.., 0]).dim());
 
-    let (_w1, _b1, _w2, _b2) = gradient_descent(x_train, y_train.to_owned(), 500, 0.1).into();
+    let (_w1, _b1, _w2, _b2) = gradient_descent(x_train, y_train.to_owned(), 1000, 0.1).into();
 }
 
 fn init_params() -> [Array2d; 4] {

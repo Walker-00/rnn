@@ -196,9 +196,23 @@ fn gradient_descent(x: Array2d, y: Array1d, iters: u32, alpha: f64) -> [Array2d;
 
         if i % 10 == 0 {
             println!("Iteration: {i}");
-            println!("Accuracy: {}", get_accuracy(get_predictions(&a2), &y));
+            println!(
+                "Accuracy: {:.2}%",
+                100. * get_accuracy(get_predictions(&a2), &y)
+            );
         }
     }
 
     [w1, b1, w2, b2]
+}
+
+fn make_predictions(
+    x: &Array2d,
+    w1: &Array2d,
+    b1: &Array2d,
+    w2: &Array2d,
+    b2: &Array2d,
+) -> Vec<usize> {
+    let (_, _, _, a2) = forward_prop(w1, b1, w2, b2, x).into();
+    get_predictions(&a2)
 }

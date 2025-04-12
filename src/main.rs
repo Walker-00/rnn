@@ -7,6 +7,8 @@ use rand::{Rng, distr::Uniform, seq::SliceRandom};
 type Array2d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 type Array1d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>>;
 
+const HIDDEN_SIZE: usize = 128;
+
 // type Wnb = [(Array2d, Array2d); 2];
 
 // fn split_and_normalize(data: &Array2<f64>, from: usize, to: usize) -> (ArrayView1<f64>, Array2<f64>) {
@@ -52,7 +54,7 @@ fn main() {
     println!("{y_train}");
     println!("{:?}", x_train.slice(s![.., 0]).dim());
 
-    let (w1, b1, w2, b2) = gradient_descent(x_train, y_train.to_owned(), 500, 0.1).into();
+    let (_w1, _b1, _w2, _b2) = gradient_descent(x_train, y_train.to_owned(), 500, 0.1).into();
 }
 
 fn init_params() -> [Array2d; 4] {
@@ -60,10 +62,10 @@ fn init_params() -> [Array2d; 4] {
 
     let dist = Uniform::new(0., 1.).unwrap();
 
-    let w1 = Array2::from_shape_fn((10, 784), |_| rng.sample(dist)) - 0.5;
-    let b1 = Array2::from_shape_fn((10, 1), |_| rng.sample(dist)) - 0.5;
+    let w1 = Array2::from_shape_fn((HIDDEN_SIZE, 784), |_| rng.sample(dist)) - 0.5;
+    let b1 = Array2::from_shape_fn((HIDDEN_SIZE, 1), |_| rng.sample(dist)) - 0.5;
 
-    let w2 = Array2::from_shape_fn((10, 10), |_| rng.sample(dist)) - 0.5;
+    let w2 = Array2::from_shape_fn((10, HIDDEN_SIZE), |_| rng.sample(dist)) - 0.5;
     let b2 = Array2::from_shape_fn((10, 1), |_| rng.sample(dist)) - 0.5;
 
     [w1, b1, w2, b2]
@@ -75,7 +77,7 @@ fn relu(z: &Array2d) -> Array2d {
     z
 }
 
-fn deriv_relvu(z: &Array2d) -> Array2d {
+fn deriv_relu(z: &Array2d) -> Array2d {
     z.mapv(|v| if v > 0. { 1. } else { 0. })
 }
 
@@ -147,7 +149,7 @@ fn back_prop(
     // let db2 = 1. / m as f64 * dz2.sum_axis(Axis(2));
     let db2 = dz2.sum_axis(Axis(1)).insert_axis(Axis(1)) * (1. / m as f64);
 
-    let dz1 = w2.t().dot(&dz2) * deriv_relvu(z1);
+    let dz1 = w2.t().dot(&dz2) * deriv_relu(z1);
     let dw1 = 1. / m as f64 * dz1.dot(&x.t());
     // let db1 = 1. / m as f64 * dz1.sum_axis(Axis(2));
     let db1 = dz1.sum_axis(Axis(1)).insert_axis(Axis(1)) * (1. / m as f64);

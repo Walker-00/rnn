@@ -1,14 +1,11 @@
-use std::{f64, iter::zip, usize};
+use std::{f64, iter::zip};
 
 use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, s};
-use polars::{frame::row, io::SerReader, prelude::*};
+use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, seq::SliceRandom};
-use rayon::iter::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator,
-    IntoParallelRefMutIterator, ParallelBridge, ParallelIterator,
-};
 
 type Array2d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
+type Array1d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>>;
 
 // type Wnb = [(Array2d, Array2d); 2];
 
@@ -41,9 +38,9 @@ fn main() {
     let data_dev_slice = data.slice(s![0..1000, ..]);
     let data_dev = data_dev_slice.t();
 
-    let y_dev = data_dev.slice(s![0, ..]);
+    let _y_dev = data_dev.slice(s![0, ..]);
     let x_dev_slice = data_dev.slice(s![1..n, ..]);
-    let x_dev = x_dev_slice.to_owned() / 255.0;
+    let _x_dev = x_dev_slice.to_owned() / 255.0;
 
     let data_train_slice = data.slice(s![1000..m, ..]);
     let data_train = data_train_slice.t();
@@ -55,7 +52,7 @@ fn main() {
     println!("{y_train}");
     println!("{:?}", x_train.slice(s![.., 0]).dim());
 
-    let (w1, b1, w2, b2) = gradient_descent(x_train, y_train, 100, 0.1).into();
+    let (w1, b1, w2, b2) = gradient_descent(x_train, y_train.to_owned(), 500, 0.1).into();
 }
 
 fn init_params() -> [Array2d; 4] {
@@ -101,7 +98,7 @@ fn forward_prop(
     [z1, a1, z2, a2]
 }
 
-fn one_hot(y: &Array2d) -> Array2d {
+fn one_hot(y: &Array1d) -> Array2d {
     let max = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
     let num_samples = y.len();
     let num_classes = *max as usize + 1;
@@ -134,7 +131,7 @@ fn back_prop(
     a2: &Array2d,
     w2: &Array2d,
     x: &Array2d,
-    y: &Array2d,
+    y: &Array1d,
 ) -> [Array2d; 4] {
     let m = y.len();
     let one_hot_y = one_hot(y);
@@ -173,21 +170,28 @@ fn update_params(
     [w1, b1, w2, b2]
 }
 
-fn get_predictions(a2: &Array2d) -> Vec<usize> {
+fn get_predictions(a2: &Array2<f64>) -> Vec<usize> {
     a2.columns()
         .into_iter()
         .map(|v| {
             v.iter()
                 .enumerate()
-                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .filter_map(|(i, &value)| {
+                    if value.is_nan() {
+                        None
+                    } else {
+                        Some((i, value))
+                    }
+                })
+                .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Less))
                 .map(|(i, _)| i)
-                .unwrap()
+                .unwrap_or(0)
         })
         .collect()
 }
 
-fn get_accuracy(predictions: Vec<usize>, y: &Array2d) -> f64 {
-    println!("{predictions:?} {y}");
+fn get_accuracy(predictions: Vec<usize>, y: &Array1d) -> f64 {
+    // println!("{predictions:?} {y}");
 
     // let label_classes: Vec<usize> = y
     //     .axis_iter(Axis(0))
@@ -207,11 +211,11 @@ fn get_accuracy(predictions: Vec<usize>, y: &Array2d) -> f64 {
     correct as f64 / y.len_of(Axis(0)) as f64
 }
 
-fn gradient_descent(x: Array2d, y: Array2d, iters: u32, alpha: f64) -> [Array2d; 4] {
+fn gradient_descent(x: Array2d, y: Array1d, iters: u32, alpha: f64) -> [Array2d; 4] {
     let (mut w1, mut b1, mut w2, mut b2) = init_params().into();
 
     for i in 0..iters {
-        let (z1, a1, z2, a2) = forward_prop(&w1, &b1, &w2, &b2, &x).into();
+        let (z1, a1, _z2, a2) = forward_prop(&w1, &b1, &w2, &b2, &x).into();
         let (dw1, db1, dw2, db2) = back_prop(&z1, &a1, &a2, &w2, &x, &y).into();
         (w1, b1, w2, b2) = update_params(&w1, &b1, &w2, &b2, &dw1, &db1, &dw2, &db2, alpha).into();
 

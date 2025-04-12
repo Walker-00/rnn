@@ -312,5 +312,5 @@ fn show_image(image: &Array1d, prediction: usize, label: f64, index: usize) {
         .unwrap();
     }
 
-    println!("Image saved to output.png");
+    println!("Image saved to {file_name}");
 }

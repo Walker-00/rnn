@@ -8,6 +8,7 @@ type Array2d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 type Array1d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>>;
 
 const HIDDEN_SIZE: usize = 10;
+const ITERS: u32 = 500;
 
 fn main() {
     let mut rng = rand::rng();
@@ -44,7 +45,7 @@ fn main() {
     println!("{y_train}");
     println!("{:?}", x_train.slice(s![.., 0]).dim());
 
-    let (_w1, _b1, _w2, _b2) = gradient_descent(x_train, y_train.to_owned(), 100, 0.1).into();
+    let (_w1, _b1, _w2, _b2) = gradient_descent(x_train, y_train.to_owned(), ITERS, 0.1).into();
 }
 
 fn init_params() -> [Array2d; 4] {
@@ -201,4 +202,3 @@ fn gradient_descent(x: Array2d, y: Array1d, iters: u32, alpha: f64) -> [Array2d;
 
     [w1, b1, w2, b2]
 }
-

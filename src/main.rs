@@ -7,8 +7,8 @@ use rand::{Rng, distr::Uniform, seq::SliceRandom};
 type Array2d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 type Array1d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>>;
 
-const HIDDEN_SIZE: usize = 10;
-const ITERS: u32 = 500;
+const HIDDEN_SIZE: usize = 100;
+const ITERS: u32 = 800;
 
 fn main() {
     let mut rng = rand::rng();

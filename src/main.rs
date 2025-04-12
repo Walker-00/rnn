@@ -287,11 +287,12 @@ fn test_prediction(
     println!("Label: {:?}", label);
 
     // Convert to image
-    show_image(&current_image);
+    show_image(&current_image, prediction[0], label, index);
 }
 
-fn show_image(image: &Array1d) {
-    let root = BitMapBackend::new("output.png", (280, 280)).into_drawing_area();
+fn show_image(image: &Array1d, prediction: usize, label: f64, index: usize) {
+    let file_name = format!("output-p{prediction}-l{label}-i{index}.png");
+    let root = BitMapBackend::new(&file_name, (280, 280)).into_drawing_area();
     root.fill(&WHITE).unwrap();
 
     let pixel_size = 10;

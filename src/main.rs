@@ -7,16 +7,7 @@ use rand::{Rng, distr::Uniform, seq::SliceRandom};
 type Array2d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 type Array1d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>>;
 
-const HIDDEN_SIZE: usize = 200;
-
-// type Wnb = [(Array2d, Array2d); 2];
-
-// fn split_and_normalize(data: &Array2<f64>, from: usize, to: usize) -> (ArrayView1<f64>, Array2<f64>) {
-//     let sliced = data.slice(s![from..to, ..]).t();
-//     let y = sliced.slice(s![0, ..]);
-//     let x = sliced.slice(s![1.., ..]).to_owned() / 255.0;
-//     (y, x)
-// }
+const HIDDEN_SIZE: usize = 10;
 
 fn main() {
     let mut rng = rand::rng();
@@ -27,7 +18,6 @@ fn main() {
         .finish()
         .unwrap();
     let data = csv_data.to_ndarray::<Float64Type>(IndexOrder::C).unwrap();
-    // data.slice();
     let (m, n) = data.dim();
     let mut rows: Vec<_> = data.axis_iter(Axis(0)).collect();
     rows.shuffle(&mut rng);
@@ -54,7 +44,7 @@ fn main() {
     println!("{y_train}");
     println!("{:?}", x_train.slice(s![.., 0]).dim());
 
-    let (_w1, _b1, _w2, _b2) = gradient_descent(x_train, y_train.to_owned(), 1000, 0.1).into();
+    let (_w1, _b1, _w2, _b2) = gradient_descent(x_train, y_train.to_owned(), 100, 0.1).into();
 }
 
 fn init_params() -> [Array2d; 4] {
@@ -111,19 +101,6 @@ fn one_hot(y: &Array1d) -> Array2d {
     let num_samples = y.len();
     let num_classes = *max as usize + 1;
     let mut one_hot_y = Array2::<f64>::zeros((num_samples, num_classes));
-
-    // let mut one_hot_y = Array2::<f64>::zeros(((y.len() as f64), max + 1.));
-
-    // let rows = one_hot_y.iter().cloned().enumerate().collect::<Vec<_>>();
-
-    // rows.into_par_iter().for_each(|(i, class_idx)| {
-    //     one_hot_y[[i, class_idx as usize]] = 1.;
-    // });
-
-    // rows.par_iter_mut().enumerate().for_each(|(i, row)| {
-    //     let class_idx = y[i as f64];
-    //     row[class_idx] = 1.
-    // });
 
     for (i, class_idx) in y.iter().enumerate() {
         one_hot_y[[i, *class_idx as usize]] = 1.;
@@ -200,17 +177,6 @@ fn get_predictions(a2: &Array2<f64>) -> Vec<usize> {
 
 fn get_accuracy(predictions: Vec<usize>, y: &Array1d) -> f64 {
     // println!("{predictions:?} {y}");
-
-    // let label_classes: Vec<usize> = y
-    //     .axis_iter(Axis(0))
-    //     .map(|row| {
-    //         row.iter()
-    //             .enumerate()
-    //             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-    //             .map(|(i, _)| i)
-    //             .unwrap()
-    //     })
-    //     .collect();
 
     let correct = zip(predictions, y)
         .filter(|(pred, label)| *pred as f64 == **label)

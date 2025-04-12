@@ -235,3 +235,4 @@ fn gradient_descent(x: Array2d, y: Array1d, iters: u32, alpha: f64) -> [Array2d;
 
     [w1, b1, w2, b2]
 }
+

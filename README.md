@@ -12,24 +12,20 @@ This is a simple implementation of a 2-layer neural network for classifying hand
 
 ### Forward Propagation
 
-Let \( X \in \mathbb{R}^{784 \times m} \) be the input matrix (m samples).
+Let `X` be the input matrix of size `784 x m` (where `m` is the number of samples).
 
-- **Hidden pre-activation**: 
-  \[
-  Z_1 = W_1 X + b_1
-  \]
-- **Hidden activation**:
-  \[
-  A_1 = \text{ReLU}(Z_1)
-  \]
-- **Output pre-activation**:
-  \[
-  Z_2 = W_2 A_1 + b_2
-  \]
-- **Output activation**:
-  \[
-  A_2 = \text{Softmax}(Z_2)
-  \]
+- **Hidden pre-activation**:  
+  `Z1 = W1 * X + b1`
+
+- **Hidden activation**:  
+  `A1 = ReLU(Z1)`
+
+- **Output pre-activation**:  
+  `Z2 = W2 * A1 + b2`
+
+- **Output activation**:  
+  `A2 = Softmax(Z2)`
+
 
 ### Backward Propagation
 
@@ -171,10 +167,11 @@ Initializes the parameters (weights and biases) for both layers of the neural ne
 
 #### Returns
 Returns an array of 4 2D arrays:
-- \( W_1 \in \mathbb{R}^{h \times 784} \): weights from input to hidden layer
-- \( b_1 \in \mathbb{R}^{h \times 1} \): biases for hidden layer
-- \( W_2 \in \mathbb{R}^{10 \times h} \): weights from hidden to output layer
-- \( b_2 \in \mathbb{R}^{10 \times 1} \): biases for output layer
+- `W_1` in ℝ^(h × 784): weights from input to hidden layer
+- `b_1` in ℝ^(h × 1): biases for hidden layer
+- `W_2` in ℝ^(10 × h): weights from hidden to output layer
+- `b_2` in ℝ^(10 × 1): biases for output layer
+
 
 ```rust 
 fn init_params(neurons: usize) -> [Array2d; 4] {
@@ -203,9 +200,7 @@ fn init_params(neurons: usize) -> [Array2d; 4] {
 
 Applies the ReLU activation function element-wise.
 
-\[
-\text{ReLU}(x) = \max(0, x)
-\]
+ReLU(x) = max(0, x)
 
 ```rust
 fn relu(z: &Array2d) -> Array2d {
@@ -243,9 +238,7 @@ fn deriv_relu(z: &Array2d) -> Array2d {
 
 Applies the softmax function across the output layer. Ensures output probabilities sum to 1 for each column (sample).
 
-\[
-\text{Softmax}(z_i) = \frac{e^{z_i}}{\sum_j e^{z_j}}
-\]
+Softmax(z_i) = e^(z_i) / Σ e^(z_j)
 
 ```rust
 fn softmax(z: &Array2d) -> Array2d {
@@ -271,18 +264,20 @@ fn softmax(z: &Array2d) -> Array2d {
 Performs forward propagation for the neural network.
 
 #### Arguments
-- \( W_1 \): Weights from input to hidden layer
-- \( b_1 \): Biases for hidden layer
-- \( W_2 \): Weights from hidden to output layer
-- \( b_2 \): Biases for output layer
-- \( X \): Input data (features)
+- `W_1`: Weights from input to hidden layer
+- `b_1`: Biases for hidden layer
+- `W_2`: Weights from hidden to output layer
+- `b_2`: Biases for output layer
+- `X`: Input data (features)
+
 
 #### Returns
 Returns the intermediate results during forward propagation:
-- \( z_1 \): Linear combination at hidden layer
-- \( a_1 \): Activations after ReLU at hidden layer
-- \( z_2 \): Linear combination at output layer
-- \( a_2 \): Activations after softmax at output layer
+- `z_1`: Linear combination at hidden layer
+- `a_1`: Activations after ReLU at hidden layer
+- `z_2`: Linear combination at output layer
+- `a_2`: Activations after softmax at output layer
+
 
 ```rust 
 fn forward_prop(
@@ -314,7 +309,7 @@ fn forward_prop(
 Converts labels into one-hot encoded matrix form. Used for computing gradients and loss.
 
 #### Arguments
-- \( y \): Array of labels (each label is an integer corresponding to the class)
+- `y`: Array of labels (each label is an integer corresponding to the class)
 
 #### Returns
 Returns the one-hot encoded matrix where each column represents the one-hot encoding of the label for each sample.
@@ -507,14 +502,14 @@ fn get_accuracy(predictions: Vec<usize>, y: &Array1d) -> f64 {
 Performs gradient descent for training the neural network. Updates parameters to minimize cross-entropy loss.
 
 #### Arguments
-- `x`: Input data matrix \( X \in \mathbb{R}^{784 \times m} \)
-- `y`: Target labels \( y \in \mathbb{R}^{m} \)
+- `x`: Input data matrix `X ∈ ℝ^(784 × m)`
+- `y`: Target labels `y ∈ ℝ^(m)`
 - `iters`: Number of training iterations
-- `alpha`: Learning rate \( \alpha \)
-- `hidden_neurons`: Number of hidden layer neurons \( h \)
+- `alpha`: Learning rate `α`
+- `hidden_neurons`: Number of hidden layer neurons `h`
 
 #### Returns
-Array of trained parameters: \( [W_1, b_1, W_2, b_2] \)
+Array of trained parameters: `[W_1, b_1, W_2, b_2]`
 
 ```rust 
 fn gradient_descent(

@@ -80,7 +80,13 @@ fn deriv_relvu(z: &Array2d) -> Array2d {
 }
 
 fn softmax(z: &Array2d) -> Array2d {
-    z.exp() / z.exp().sum()
+    let max_per_col = z.map_axis(Axis(0), |col| {
+        col.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+    });
+    let shifted = z - &max_per_col.insert_axis(Axis(0));
+    let exp = shifted.mapv(|x| x.exp());
+    let sum_exp = exp.sum_axis(Axis(0)).insert_axis(Axis(0));
+    &exp / &sum_exp
 }
 
 fn forward_prop(

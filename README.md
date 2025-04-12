@@ -217,13 +217,10 @@ fn relu(z: &Array2d) -> Array2d {
 
 Computes the derivative of ReLU for backpropagation.
 
-\[
-\text{ReLU}'(x) =
-\begin{cases}
-1 & \text{if } x > 0 \\
-0 & \text{if } x \leq 0
-\end{cases}
-\]
+ReLU'(x) = 
+  - 1 if `x > 0`
+  - 0 if `x <= 0`
+
 
 ```rust
 fn deriv_relu(z: &Array2d) -> Array2d {

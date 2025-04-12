@@ -10,8 +10,10 @@ lto = true
 codegen-units = 1
 
 [dependencies]
+clap = { version = "4.5.36", features = ["derive"] }
 csv = "1.3.1"
 ndarray = { version = "0.16.1", features = ["rayon"] }
+plotters = "0.3.7"
 polars = { version = "0.46.0", features = ["ndarray"] }
 polars-core = { version = "0.46.0", features = ["ndarray"] }
 rand = "0.9.0"

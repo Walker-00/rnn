@@ -1,14 +1,15 @@
 use std::{f64, iter::zip};
 
 use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, s};
+use plotters::prelude::*;
 use polars::{io::SerReader, prelude::*};
-use rand::{Rng, distr::Uniform, seq::SliceRandom};
+use rand::{Rng, distr::Uniform, random, seq::SliceRandom};
 
 type Array2d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
 type Array1d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>>;
 
-const HIDDEN_SIZE: usize = 100;
-const ITERS: u32 = 800;
+const HIDDEN_SIZE: usize = 128;
+const ITERS: u32 = 500;
 
 fn main() {
     let mut rng = rand::rng();
@@ -31,9 +32,9 @@ fn main() {
     let data_dev_slice = data.slice(s![0..1000, ..]);
     let data_dev = data_dev_slice.t();
 
-    let _y_dev = data_dev.slice(s![0, ..]);
+    let y_dev = data_dev.slice(s![0, ..]);
     let x_dev_slice = data_dev.slice(s![1..n, ..]);
-    let _x_dev = x_dev_slice.to_owned() / 255.0;
+    let x_dev = x_dev_slice.to_owned() / 255.0;
 
     let data_train_slice = data.slice(s![1000..m, ..]);
     let data_train = data_train_slice.t();
@@ -45,7 +46,26 @@ fn main() {
     println!("{y_train}");
     println!("{:?}", x_train.slice(s![.., 0]).dim());
 
-    let (_w1, _b1, _w2, _b2) = gradient_descent(x_train, y_train.to_owned(), ITERS, 0.1).into();
+    let (w1, b1, w2, b2) =
+        gradient_descent(x_train.to_owned(), y_train.to_owned(), ITERS, 0.1).into();
+
+    for _ in 0..100 {
+        test_prediction(
+            random::<u8>() as usize,
+            &x_train,
+            &y_train.to_owned(),
+            &w1,
+            &b1,
+            &w2,
+            &b2,
+        );
+    }
+
+    let dev_predictions = make_predictions(&x_dev, &w1, &b1, &w2, &b2);
+    println!(
+        "Un Tested Data Accuracy: {}",
+        get_accuracy(dev_predictions, &y_dev.to_owned())
+    );
 }
 
 fn init_params() -> [Array2d; 4] {
@@ -215,4 +235,51 @@ fn make_predictions(
 ) -> Vec<usize> {
     let (_, _, _, a2) = forward_prop(w1, b1, w2, b2, x).into();
     get_predictions(&a2)
+}
+
+fn test_prediction(
+    index: usize,
+    x_train: &Array2<f64>,
+    y_train: &Array1d,
+    w1: &Array2d,
+    b1: &Array2d,
+    w2: &Array2d,
+    b2: &Array2d,
+) {
+    // Get the column at the specified index
+    let current_image = x_train.slice(s![.., index]).to_owned();
+
+    // Run prediction
+    let prediction = make_predictions(&current_image.clone().insert_axis(Axis(1)), w1, b1, w2, b2);
+    let label = y_train[index];
+
+    println!("Prediction: {:?}", prediction[0]);
+    println!("Label: {:?}", label);
+
+    // Convert to image
+    show_image(&current_image);
+}
+
+fn show_image(image: &Array1d) {
+    let root = BitMapBackend::new("output.png", (280, 280)).into_drawing_area();
+    root.fill(&WHITE).unwrap();
+
+    let pixel_size = 10;
+    for (i, val) in image.iter().enumerate() {
+        let row = i / 28;
+        let col = i % 28;
+        let gray = (*val * 255.0) as u8;
+        let color = RGBColor(gray, gray, gray);
+
+        root.draw(&Rectangle::new(
+            [
+                (col as i32 * pixel_size, row as i32 * pixel_size),
+                ((col + 1) as i32 * pixel_size, (row + 1) as i32 * pixel_size),
+            ],
+            color.filled(),
+        ))
+        .unwrap();
+    }
+
+    println!("Image saved to output.png");
 }

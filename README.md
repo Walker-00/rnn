@@ -514,7 +514,7 @@ Performs gradient descent for training the neural network. Updates parameters to
 - `hidden_neurons`: Number of hidden layer neurons \( h \)
 
 #### Returns
-Tuple of trained parameters: \( (W_1, b_1, W_2, b_2) \)
+Array of trained parameters: \( [W_1, b_1, W_2, b_2] \)
 
 ```rust 
 fn gradient_descent(

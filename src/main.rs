@@ -84,12 +84,6 @@ fn main() {
             &b2,
         );
     }
-
-    // let dev_predictions = make_predictions(&x_dev, &w1, &b1, &w2, &b2);
-    // println!(
-    //     "Un Tested Data Accuracy: {}",
-    //     get_accuracy(dev_predictions, &y_dev.to_owned())
-    // );
 }
 
 fn init_params(neurons: usize) -> [Array2d; 4] {

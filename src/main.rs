@@ -1,3 +1,24 @@
+//! # Handwritten Digit Recognizer (MNIST) in Rust
+//!
+//! This is a simple implementation of a 2-layer neural network for classifying handwritten digits from the MNIST dataset.
+//!
+//! - Input Layer: 784 units (28x28 pixels)
+//! - Hidden Layer: `neurons` units with ReLU activation
+//! - Output Layer: 10 units with Softmax activation
+//!
+//! ## Mathematical Formulation
+//!
+//! ### Forward Propagation
+//! Let \( X \in \mathbb{R}^{784 \times m} \) be the input matrix (m samples).
+//!
+//! - Hidden pre-activation: \( Z_1 = W_1 X + b_1 \)
+//! - Hidden activation: \( A_1 = \text{ReLU}(Z_1) \)
+//! - Output pre-activation: \( Z_2 = W_2 A_1 + b_2 \)
+//! - Output activation: \( A_2 = \text{Softmax}(Z_2) \)
+//!
+//! ### Backward Propagation
+//! Gradient descent is used to minimize the cross-entropy loss.
+
 use std::{f64, iter::zip};
 
 use clap::Parser;
@@ -6,9 +27,13 @@ use plotters::prelude::*;
 use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, random, seq::SliceRandom};
 
+/// Alias for a 2D array of f64
 type Array2d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
+
+/// Alias for a 1D array of f64
 type Array1d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>>;
 
+/// Command line arguments
 #[derive(Parser, Debug)]
 struct Args {
     /// Set how much iteration to train
@@ -23,32 +48,52 @@ struct Args {
     #[arg(short, long)]
     test_prediction: usize,
 
-    /// Set the Learning rate
+    /// Set the Learning rate α
     #[arg(short, long)]
     alpha: f64,
 }
 
+/// Entry point: loads MNIST data, trains a neural network using gradient descent,
+/// and visualizes predictions on the test set.
 fn main() {
+    // ------------------------
+    // 1. Parse CLI Arguments
+    // ------------------------
     let args = Args::parse();
+
+    // Initialize random number generator
     let mut rng = rand::rng();
+
+    // ------------------------
+    // 2. Load and Preprocess Data
+    // ------------------------
+
+    // Load CSV data
     let csv_data = CsvReadOptions::default()
         .with_has_header(true)
         .try_into_reader_with_file_path(Some("data/train.csv".into()))
         .unwrap()
         .finish()
         .unwrap();
+
+    // Convert CSV data to ndarray
     let data = csv_data.to_ndarray::<Float64Type>(IndexOrder::C).unwrap();
     let (m, n) = data.dim();
+
+    // Shuffle rows to prevent overfitting to dataset order
     let mut rows: Vec<_> = data.axis_iter(Axis(0)).collect();
     rows.shuffle(&mut rng);
 
+    // Stack shuffled rows back into a single ndarray
     let data = ndarray::stack(
         Axis(0),
         &rows.iter().map(|row| row.view()).collect::<Vec<_>>(),
     )
     .unwrap();
+
+    // Split into dev and train sets
     let data_dev_slice = data.slice(s![0..1000, ..]);
-    let data_dev = data_dev_slice.t();
+    let data_dev = data_dev_slice.t(); // shape: (n, 1000) => transpose for column-major
 
     let y_dev = data_dev.slice(s![0, ..]);
     let x_dev_slice = data_dev.slice(s![1..n, ..]);
@@ -61,9 +106,9 @@ fn main() {
     let x_train_slice = data_train.slice(s![1..n, ..]);
     let x_train = x_train_slice.to_owned() / 255.0;
 
-    println!("{y_train}");
-    println!("{:?}", x_train.slice(s![.., 0]).dim());
-
+    // ------------------------
+    // 3. Train Neural Network
+    // ------------------------
     let (w1, b1, w2, b2) = gradient_descent(
         x_train.to_owned(),
         y_train.to_owned(),
@@ -72,6 +117,10 @@ fn main() {
         args.neurons,
     )
     .into();
+
+    // ------------------------
+    // 4. Evaluate with Predictions
+    // ------------------------
 
     for _ in 0..args.test_prediction {
         test_prediction(
@@ -86,11 +135,20 @@ fn main() {
     }
 }
 
+/// Initializes the parameters (weights and biases) for both layers of the neural network.
+///
+/// # Returns
+/// Returns an array of 4 2d arrays:
+/// - \( W_1 \in \mathbb{R}^{h \times 784} \): weights from input to hidden layer
+/// - \( b_1 \in \mathbb{R}^{h \times 1} \): biases for hidden layer
+/// - \( W_2 \in \mathbb{R}^{10 \times h} \): weights from hidden to output layer
+/// - \( b_2 \in \mathbb{R}^{10 \times 1} \): biases for output layer
 fn init_params(neurons: usize) -> [Array2d; 4] {
     let mut rng = rand::rng();
 
     let dist = Uniform::new(0., 1.).unwrap();
 
+    // Initialize weights and biases with random values in [-0.5, 0.5)
     let w1 = Array2::from_shape_fn((neurons, 784), |_| rng.sample(dist)) - 0.5;
     let b1 = Array2::from_shape_fn((neurons, 1), |_| rng.sample(dist)) - 0.5;
 
@@ -100,16 +158,26 @@ fn init_params(neurons: usize) -> [Array2d; 4] {
     [w1, b1, w2, b2]
 }
 
+/// Applies the ReLU activation function element-wise.
+///
+/// \[ \text{ReLU}(x) = \max(0, x) \]
 fn relu(z: &Array2d) -> Array2d {
     let mut z = z.clone();
     z.par_mapv_inplace(|v| v.max(0.0));
     z
 }
 
+/// Computes the derivative of ReLU for backpropagation.
+///
+/// \[ \text{ReLU}'(x) = \begin{cases} 1 & x > 0 \\ 0 & x \leq 0 \end{cases} \]
 fn deriv_relu(z: &Array2d) -> Array2d {
     z.mapv(|v| if v > 0. { 1. } else { 0. })
 }
 
+/// Applies the softmax function across the output layer.
+/// Ensures output probabilities sum to 1 for each column (sample).
+///
+/// \[ \text{Softmax}(z_i) = \frac{e^{z_i}}{\sum_j e^{z_j}} \]
 fn softmax(z: &Array2d) -> Array2d {
     let max_per_col = z.map_axis(Axis(0), |col| {
         col.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
@@ -135,6 +203,8 @@ fn forward_prop(
     [z1, a1, z2, a2]
 }
 
+/// Converts labels into one-hot encoded matrix form.
+/// Used for computing gradients and loss.
 fn one_hot(y: &Array1d) -> Array2d {
     let max = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
     let num_samples = y.len();
@@ -224,6 +294,18 @@ fn get_accuracy(predictions: Vec<usize>, y: &Array1d) -> f64 {
     correct as f64 / y.len_of(Axis(0)) as f64
 }
 
+/// Performs gradient descent for training the neural network.
+/// Updates parameters to minimize cross-entropy loss.
+///
+/// # Arguments
+/// - `x`: Input data matrix \( X \in \mathbb{R}^{784 \times m} \)
+/// - `y`: Target labels \( y \in \mathbb{R}^{m} \)
+/// - `iters`: Number of training iterations
+/// - `alpha`: Learning rate \( \alpha \)
+/// - `hidden_neurons`: Number of hidden layer neurons \( h \)
+///
+/// # Returns
+/// Tuple of trained parameters: \( (W_1, b_1, W_2, b_2) \)
 fn gradient_descent(
     x: Array2d,
     y: Array1d,
@@ -261,6 +343,7 @@ fn make_predictions(
     get_predictions(&a2)
 }
 
+/// Displays a prediction for a single test sample, showing the image and predicted label.
 fn test_prediction(
     index: usize,
     x_train: &Array2<f64>,
@@ -308,3 +391,4 @@ fn show_image(image: &Array1d, prediction: usize, label: f64, index: usize) {
 
     println!("Image saved to {file_name}");
 }
+

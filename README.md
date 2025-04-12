@@ -159,7 +159,9 @@ fn main() {
             &b2,
         );
     }
-}```
+}
+
+```
 
 ### `init_params(neurons: usize) -> [Array2d; 4]`
 

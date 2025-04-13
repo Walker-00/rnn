@@ -469,8 +469,8 @@ fn gradient_descent(
         }
 
         // Optional: evaluate after each epoch (1 full pass)
-        // if i % 10 == 0 {
-        if true {
+        if i % 10 == 0 {
+            // if true {
             let (_, _, _, a2_full) = forward_prop(&w1, &b1, &w2, &b2, &x).into();
             let acc = get_accuracy(get_predictions(&a2_full), &y);
             println!("Iteration {i}: Accuracy = {:.4}%", acc * 100.0);

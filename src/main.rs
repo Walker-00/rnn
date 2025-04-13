@@ -19,7 +19,7 @@
 //! ### Backward Propagation
 //! Gradient descent is used to minimize the cross-entropy loss.
 
-use std::{f64, iter::zip};
+use std::iter::zip;
 
 use clap::Parser;
 use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, s};
@@ -27,11 +27,11 @@ use plotters::prelude::*;
 use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, random, seq::SliceRandom};
 
-/// Alias for a 2D array of f64
-type Array2d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>;
+/// Alias for a 2D array of f32
+type Array2d = ArrayBase<OwnedRepr<f32>, Dim<[usize; 2]>>;
 
-/// Alias for a 1D array of f64
-type Array1d = ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>>;
+/// Alias for a 1D array of f32
+type Array1d = ArrayBase<OwnedRepr<f32>, Dim<[usize; 1]>>;
 
 /// Command line arguments
 #[derive(Parser, Debug)]
@@ -50,7 +50,7 @@ struct Args {
 
     /// Set the Learning rate α
     #[arg(short, long)]
-    alpha: f64,
+    alpha: f32,
 
     /// Set gradient descent batch
     /// Smaller for better but can cause shape error
@@ -83,7 +83,7 @@ fn main() {
         .unwrap();
 
     // Convert CSV data to ndarray
-    let data = csv_data.to_ndarray::<Float64Type>(IndexOrder::C).unwrap();
+    let data = csv_data.to_ndarray::<Float32Type>(IndexOrder::C).unwrap();
     let (m, n) = data.dim();
 
     // Shuffle rows to prevent overfitting to dataset order
@@ -193,9 +193,9 @@ fn relu(z: &Array2d) -> Array2d {
 /// Computes the derivative of ReLU for backpropagation.
 ///
 /// \[ \text{ReLU}'(x) = \begin{cases} 1 & x > 0 \\ 0 & x \leq 0 \end{cases} \]
-fn deriv_relu(z: &Array2d) -> Array2d {
+fn deriv_relu(z: &mut Array2d) {
     // Derivative of ReLU: 1 if x > 0, otherwise 0.
-    z.mapv(|v| if v > 0. { 1. } else { 0. })
+    z.par_mapv_inplace(|v| if v > 0. { 1. } else { 0. });
 }
 
 /// Applies the softmax function across the output layer.
@@ -205,16 +205,16 @@ fn deriv_relu(z: &Array2d) -> Array2d {
 fn softmax(z: &Array2d) -> Array2d {
     // Find the max value for each column to avoid overflow during exponentiation.
     let max_per_col = z.map_axis(Axis(0), |col| {
-        col.iter().cloned().fold(f64::NEG_INFINITY, f64::max) // Get the max per column
+        col.iter().cloned().fold(f32::NEG_INFINITY, f32::max) // Get the max per column
     });
     // Shift the values in z to prevent overflow during exponentiation
-    let shifted = z - &max_per_col.insert_axis(Axis(0)); // Subtract the max for each column
+    let mut shifted = z - &max_per_col.insert_axis(Axis(0)); // Subtract the max for each column
     // Exponentiate each element: \( e^{z_i} \)
-    let exp = shifted.mapv(|x| x.exp()); // Apply exponential function element-wise
+    shifted.par_mapv_inplace(|x| x.exp()); // Apply exponential function element-wise
     // Sum the exponentiated values along each column: \( \sum_j e^{z_j} \)
-    let sum_exp = exp.sum_axis(Axis(0)).insert_axis(Axis(0)); // Sum across columns
+    let sum_exp = shifted.sum_axis(Axis(0)).insert_axis(Axis(0)); // Sum across columns
     // Return the normalized (probability) values: \( \frac{e^{z_i}}{\sum_j e^{z_j}} \)
-    &exp / &sum_exp
+    &shifted / &sum_exp
 }
 
 /// Performs forward propagation for the neural network.
@@ -267,7 +267,7 @@ fn one_hot(y: &Array1d) -> Array2d {
     let max = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
     let num_samples = y.len();
     let num_classes = *max as usize + 1; // Assume classes are in range [0, max_class]
-    let mut one_hot_y = Array2::<f64>::zeros((num_samples, num_classes)); // Initialize matrix of zeros
+    let mut one_hot_y = Array2::<f32>::zeros((num_samples, num_classes)); // Initialize matrix of zeros
 
     // Set the appropriate index in each row to 1 based on the label
     for (i, class_idx) in y.iter().enumerate() {
@@ -294,7 +294,7 @@ fn one_hot(y: &Array1d) -> Array2d {
 /// # Returns
 /// Returns a tuple of the gradients for the weights and biases of both layers: `[dw1, db1, dw2, db2]`.
 fn back_prop(
-    z1: &Array2d,
+    mut z1: Array2d,
     a1: &Array2d,
     // z2: Array2d, // Not used in this function but could be for the second layer's pre-activation.
     a2: &Array2d,
@@ -311,24 +311,25 @@ fn back_prop(
 
     // Compute the gradient of the loss with respect to the weights of the second layer (dw2).
     // This is the dot product of dz2 (error term) and the transpose of a1 (activations of the first layer).
-    let dw2 = 1. / m as f64 * dz2.dot(&a1.t());
+    let dw2 = 1. / m as f32 * dz2.dot(&a1.t());
 
     // Compute the gradient of the loss with respect to the biases of the second layer (db2).
     // This is the sum of dz2 along axis 1, normalized by the number of examples (m).
-    let db2 = dz2.sum_axis(Axis(1)).insert_axis(Axis(1)) * (1. / m as f64);
+    let db2 = dz2.sum_axis(Axis(1)).insert_axis(Axis(1)) * (1. / m as f32);
 
     // Compute the gradient of the loss with respect to the first layer's activations (dz1).
     // This is the dot product of the transpose of w2 (weights of the second layer) and dz2 (error term),
     // followed by element-wise multiplication with the derivative of the ReLU function (deriv_relu).
-    let dz1 = w2.t().dot(&dz2) * deriv_relu(z1);
+    deriv_relu(&mut z1);
+    let dz1 = w2.t().dot(&dz2) * z1;
 
     // Compute the gradient of the loss with respect to the weights of the first layer (dw1).
     // This is the dot product of dz1 (error term) and the transpose of x (input data).
-    let dw1 = 1. / m as f64 * dz1.dot(&x.t());
+    let dw1 = 1. / m as f32 * dz1.dot(&x.t());
 
     // Compute the gradient of the loss with respect to the biases of the first layer (db1).
     // This is the sum of dz1 along axis 1, normalized by the number of examples (m).
-    let db1 = dz1.sum_axis(Axis(1)).insert_axis(Axis(1)) * (1. / m as f64);
+    let db1 = dz1.sum_axis(Axis(1)).insert_axis(Axis(1)) * (1. / m as f32);
 
     // Return the gradients for the weights and biases of both layers.
     [dw1, db1, dw2, db2]
@@ -361,7 +362,7 @@ fn update_params(
     db1: &Array2d,
     dw2: &Array2d,
     db2: &Array2d,
-    alpha: f64,
+    alpha: f32,
 ) -> [Array2d; 4] {
     // Update the weights and biases by subtracting the gradients scaled by the learning rate (alpha).
     let w1 = w1 - alpha * dw1;
@@ -382,7 +383,7 @@ fn update_params(
 ///
 /// # Returns
 /// A vector of predicted labels (indices of the highest activation values).
-fn get_predictions(a2: &Array2<f64>) -> Vec<usize> {
+fn get_predictions(a2: &Array2d) -> Vec<usize> {
     // For each column (sample) in the activation matrix `a2`, find the index with the maximum value.
     a2.columns()
         .into_iter()
@@ -413,14 +414,14 @@ fn get_predictions(a2: &Array2<f64>) -> Vec<usize> {
 ///
 /// # Returns
 /// The accuracy of the model as a floating-point value between 0 and 1.
-fn get_accuracy(predictions: Vec<usize>, y: &Array1d) -> f64 {
+fn get_accuracy(predictions: Vec<usize>, y: &Array1d) -> f32 {
     // Count how many predictions match the true labels.
     let correct = zip(predictions, y)
-        .filter(|(pred, label)| *pred as f64 == **label) // Check if predicted label equals true label.
+        .filter(|(pred, label)| *pred as f32 == **label) // Check if predicted label equals true label.
         .count();
 
     // Return the accuracy as the ratio of correct predictions to total examples.
-    correct as f64 / y.len_of(Axis(0)) as f64
+    correct as f32 / y.len_of(Axis(0)) as f32
 }
 
 /// Performs gradient descent for training the neural network.
@@ -439,7 +440,7 @@ fn gradient_descent(
     x: Array2d,
     y: Array1d,
     iters: u32,
-    alpha: f64,
+    alpha: f32,
     neurons: usize,
     batch_size: usize,
 ) -> [Array2d; 4] {
@@ -463,7 +464,7 @@ fn gradient_descent(
             let y_batch = y.slice(s![start..end]).to_owned();
 
             let (z1, a1, _z2, a2) = forward_prop(&w1, &b1, &w2, &b2, &x_batch).into();
-            let (dw1, db1, dw2, db2) = back_prop(&z1, &a1, &a2, &w2, &x_batch, &y_batch).into();
+            let (dw1, db1, dw2, db2) = back_prop(z1, &a1, &a2, &w2, &x_batch, &y_batch).into();
             (w1, b1, w2, b2) =
                 update_params(&w1, &b1, &w2, &b2, &dw1, &db1, &dw2, &db2, alpha).into();
         }
@@ -518,7 +519,7 @@ fn make_predictions(
 /// - `b2`: Biases for the second layer.
 fn test_prediction(
     index: usize,
-    x_train: &Array2<f64>,
+    x_train: &Array2d,
     y_train: &Array1d,
     w1: &Array2d,
     b1: &Array2d,
@@ -547,7 +548,7 @@ fn test_prediction(
 /// - `prediction`: The predicted label for the image.
 /// - `label`: The true label for the image.
 /// - `index`: The index of the image sample.
-fn show_image(image: &Array1d, prediction: usize, label: f64, index: usize) {
+fn show_image(image: &Array1d, prediction: usize, label: f32, index: usize) {
     // Generate a file name based on prediction, label, and index.
     let file_name = format!("output-p{prediction}-l{label}-i{index}.png");
     let root = BitMapBackend::new(&file_name, (280, 280)).into_drawing_area();

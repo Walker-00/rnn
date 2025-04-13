@@ -52,7 +52,9 @@ struct Args {
     #[arg(short, long)]
     alpha: f64,
 
-    /// Set gradient descent batch size
+    /// Set gradient descent batch
+    /// Smaller for better but can cause shape error
+    /// Recommended: 76 or higher
     #[arg(short, long)]
     batch_size: usize,
 }
@@ -444,13 +446,18 @@ fn gradient_descent(
     // Initialize the parameters: weights and biases for the two layers.
     let (mut w1, mut b1, mut w2, mut b2) = init_params(neurons).into();
     let total_samples = x.len_of(Axis(1));
-    let num_batches = total_samples / batch_size;
+    let num_batches = total_samples.div_ceil(batch_size);
 
     // Gradient descent loop for a specified number of iterations.
     for i in 0..iters {
         for b in 0..num_batches {
             let start = b * batch_size;
-            let end = start + batch_size;
+            let end = (start + batch_size).min(total_samples);
+
+            if start >= end {
+                eprintln!("Skipping empty batch {b}");
+                continue;
+            }
 
             let x_batch = x.slice(s![.., start..end]).to_owned();
             let y_batch = y.slice(s![start..end]).to_owned();
@@ -462,10 +469,11 @@ fn gradient_descent(
         }
 
         // Optional: evaluate after each epoch (1 full pass)
-        if i % 10 == 0 {
+        // if i % 10 == 0 {
+        if true {
             let (_, _, _, a2_full) = forward_prop(&w1, &b1, &w2, &b2, &x).into();
             let acc = get_accuracy(get_predictions(&a2_full), &y);
-            println!("Iteration {i}: Accuracy = {:.2}%", acc * 100.0);
+            println!("Iteration {i}: Accuracy = {:.4}%", acc * 100.0);
         }
     }
     // Return the trained parameters (weights and biases).

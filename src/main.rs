@@ -51,6 +51,10 @@ struct Args {
     /// Set the Learning rate α
     #[arg(short, long)]
     alpha: f64,
+
+    /// Set gradient descent batch size
+    #[arg(short, long)]
+    batch_size: usize,
 }
 
 /// Entry point: loads MNIST data, trains a neural network using gradient descent,
@@ -126,6 +130,7 @@ fn main() {
         args.iters,
         args.alpha,
         args.neurons,
+        args.batch_size,
     )
     .into();
 
@@ -434,31 +439,35 @@ fn gradient_descent(
     iters: u32,
     alpha: f64,
     neurons: usize,
+    batch_size: usize,
 ) -> [Array2d; 4] {
     // Initialize the parameters: weights and biases for the two layers.
     let (mut w1, mut b1, mut w2, mut b2) = init_params(neurons).into();
+    let total_samples = x.len_of(Axis(1));
+    let num_batches = total_samples / batch_size;
 
     // Gradient descent loop for a specified number of iterations.
     for i in 0..iters {
-        // Perform forward propagation to get activations.
-        let (z1, a1, _z2, a2) = forward_prop(&w1, &b1, &w2, &b2, &x).into();
+        for b in 0..num_batches {
+            let start = b * batch_size;
+            let end = start + batch_size;
 
-        // Perform backpropagation to get the gradients for weights and biases.
-        let (dw1, db1, dw2, db2) = back_prop(&z1, &a1, &a2, &w2, &x, &y).into();
+            let x_batch = x.slice(s![.., start..end]).to_owned();
+            let y_batch = y.slice(s![start..end]).to_owned();
 
-        // Update parameters using the gradients and learning rate.
-        (w1, b1, w2, b2) = update_params(&w1, &b1, &w2, &b2, &dw1, &db1, &dw2, &db2, alpha).into();
+            let (z1, a1, _z2, a2) = forward_prop(&w1, &b1, &w2, &b2, &x_batch).into();
+            let (dw1, db1, dw2, db2) = back_prop(&z1, &a1, &a2, &w2, &x_batch, &y_batch).into();
+            (w1, b1, w2, b2) =
+                update_params(&w1, &b1, &w2, &b2, &dw1, &db1, &dw2, &db2, alpha).into();
+        }
 
-        // Every 10 iterations, print out the current accuracy for monitoring.
+        // Optional: evaluate after each epoch (1 full pass)
         if i % 10 == 0 {
-            println!("Iteration: {i}");
-            println!(
-                "Accuracy: {:.2}%",
-                100. * get_accuracy(get_predictions(&a2), &y)
-            );
+            let (_, _, _, a2_full) = forward_prop(&w1, &b1, &w2, &b2, &x).into();
+            let acc = get_accuracy(get_predictions(&a2_full), &y);
+            println!("Iteration {i}: Accuracy = {:.2}%", acc * 100.0);
         }
     }
-
     // Return the trained parameters (weights and biases).
     [w1, b1, w2, b2]
 }

@@ -26,6 +26,7 @@ use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, s};
 use plotters::prelude::*;
 use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, random, seq::SliceRandom};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 /// Alias for a 2D array of f32
 type Array2d = ArrayBase<OwnedRepr<f32>, Dim<[usize; 2]>>;
@@ -93,7 +94,7 @@ fn main() {
     // Stack shuffled rows back into a single ndarray
     let data = ndarray::stack(
         Axis(0),
-        &rows.iter().map(|row| row.view()).collect::<Vec<_>>(),
+        &rows.par_iter().map(|row| row.view()).collect::<Vec<_>>(),
     )
     .unwrap();
 
@@ -127,8 +128,8 @@ fn main() {
     // 3. Train Neural Network
     // ------------------------
     let (w1, b1, w2, b2) = gradient_descent(
-        x_train.to_owned(),
-        y_train.to_owned(),
+        &x_train,
+        &y_train.to_owned(),
         args.iters,
         args.alpha,
         args.neurons,
@@ -204,9 +205,8 @@ fn deriv_relu(z: &mut Array2d) {
 /// \[ \text{Softmax}(z_i) = \frac{e^{z_i}}{\sum_j e^{z_j}} \]
 fn softmax(z: &Array2d) -> Array2d {
     // Find the max value for each column to avoid overflow during exponentiation.
-    let max_per_col = z.map_axis(Axis(0), |col| {
-        col.iter().cloned().fold(f32::NEG_INFINITY, f32::max) // Get the max per column
-    });
+    let max_per_col = z.fold_axis(Axis(0), f32::NEG_INFINITY, |a, b| a.max(*b));
+
     // Shift the values in z to prevent overflow during exponentiation
     let mut shifted = z - &max_per_col.insert_axis(Axis(0)); // Subtract the max for each column
     // Exponentiate each element: \( e^{z_i} \)
@@ -437,8 +437,8 @@ fn get_accuracy(predictions: Vec<usize>, y: &Array1d) -> f32 {
 /// # Returns
 /// Tuple of trained parameters: \( (W_1, b_1, W_2, b_2) \)
 fn gradient_descent(
-    x: Array2d,
-    y: Array1d,
+    x: &Array2d,
+    y: &Array1d,
     iters: u32,
     alpha: f32,
     neurons: usize,
@@ -472,8 +472,8 @@ fn gradient_descent(
         // Optional: evaluate after each epoch (1 full pass)
         if i % 10 == 0 {
             // if true {
-            let (_, _, _, a2_full) = forward_prop(&w1, &b1, &w2, &b2, &x).into();
-            let acc = get_accuracy(get_predictions(&a2_full), &y);
+            let (_, _, _, a2_full) = forward_prop(&w1, &b1, &w2, &b2, x).into();
+            let acc = get_accuracy(get_predictions(&a2_full), y);
             println!("Iteration {i}: Accuracy = {:.4}%", acc * 100.0);
         }
     }

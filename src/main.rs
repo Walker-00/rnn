@@ -22,7 +22,7 @@
 use std::iter::zip;
 
 use clap::Parser;
-use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, s};
+use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, Zip, s};
 use plotters::prelude::*;
 use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, random, seq::SliceRandom};
@@ -207,8 +207,10 @@ fn softmax(z: &Array2d) -> Array2d {
     // Find the max value for each column to avoid overflow during exponentiation.
     let max_per_col = z.fold_axis(Axis(0), f32::NEG_INFINITY, |a, b| a.max(*b));
 
+    let max_view = max_per_col.broadcast(z.raw_dim()).unwrap();
+
     // Shift the values in z to prevent overflow during exponentiation
-    let mut shifted = z - &max_per_col.insert_axis(Axis(0)); // Subtract the max for each column
+    let mut shifted = z - &max_view; // Subtract the max for each column
     // Exponentiate each element: \( e^{z_i} \)
     shifted.par_mapv_inplace(|x| x.exp()); // Apply exponential function element-wise
     // Sum the exponentiated values along each column: \( \sum_j e^{z_j} \)
@@ -264,15 +266,24 @@ fn forward_prop(
 /// for each sample.
 fn one_hot(y: &Array1d) -> Array2d {
     // Find the maximum class label to determine the number of classes
-    let max = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+    let max = y
+        .par_iter()
+        .max_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap();
     let num_samples = y.len();
     let num_classes = *max as usize + 1; // Assume classes are in range [0, max_class]
     let mut one_hot_y = Array2::<f32>::zeros((num_samples, num_classes)); // Initialize matrix of zeros
 
     // Set the appropriate index in each row to 1 based on the label
-    for (i, class_idx) in y.iter().enumerate() {
-        one_hot_y[[i, *class_idx as usize]] = 1.; // One-hot encoding: set the corresponding class to 1
-    }
+    // for (i, class_idx) in y.iter().enumerate() {
+    //     one_hot_y[[i, *class_idx as usize]] = 1.; // One-hot encoding: set the corresponding class to 1
+    // }
+
+    Zip::from(y)
+        .and(one_hot_y.outer_iter_mut())
+        .par_for_each(|&class_idx, mut row| {
+            row[class_idx as usize] = 1.; // One-hot encoding: set the corresponding class to 1
+        });
 
     // Return the transpose of the one-hot encoded matrix
     one_hot_y.t().to_owned() // Return transposed matrix to match expected shape

@@ -22,17 +22,17 @@
 use std::iter::zip;
 
 use clap::Parser;
-use ndarray::{Array2, ArrayBase, Axis, Dim, OwnedRepr, Zip, s};
+use ndarray::{Array2, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr, Zip, s};
 use plotters::prelude::*;
 use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, random, seq::SliceRandom};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 /// Alias for a 2D array of f32
 type Array2d = ArrayBase<OwnedRepr<f32>, Dim<[usize; 2]>>;
 
 /// Alias for a 1D array of f32
-type Array1d = ArrayBase<OwnedRepr<f32>, Dim<[usize; 1]>>;
+// type Array1d = ArrayBase<OwnedRepr<f32>, Dim<[usize; 1]>>;
 
 /// Command line arguments
 #[derive(Parser, Debug)]
@@ -76,6 +76,7 @@ fn main() {
     // ------------------------
 
     // Load CSV data
+
     let csv_data = CsvReadOptions::default()
         .with_has_header(true)
         .try_into_reader_with_file_path(Some("data/train.csv".into()))
@@ -83,20 +84,13 @@ fn main() {
         .finish()
         .unwrap();
 
-    // Convert CSV data to ndarray
     let data = csv_data.to_ndarray::<Float32Type>(IndexOrder::C).unwrap();
     let (m, n) = data.dim();
 
-    // Shuffle rows to prevent overfitting to dataset order
-    let mut rows: Vec<_> = data.axis_iter(Axis(0)).collect();
-    rows.shuffle(&mut rng);
+    let mut indices: Vec<usize> = (0..m).collect();
+    indices.shuffle(&mut rng);
 
-    // Stack shuffled rows back into a single ndarray
-    let data = ndarray::stack(
-        Axis(0),
-        &rows.par_iter().map(|row| row.view()).collect::<Vec<_>>(),
-    )
-    .unwrap();
+    let data = data.select(Axis(0), &indices);
 
     // Split into dev and train sets
 
@@ -110,7 +104,7 @@ fn main() {
     // The remaining rows are the features (x_dev) for the development set.
     let x_dev_slice = data_dev.slice(s![1..n, ..]);
     // Normalize the feature values by dividing by 255.0 to scale the values between 0 and 1.
-    let x_dev = x_dev_slice.to_owned() / 255.0;
+    let x_dev = x_dev_slice.mapv(|v| v / 255.0);
 
     // Slice the remaining rows from the original dataset for the training set (train set).
     let data_train_slice = data.slice(s![1000..m, ..]);
@@ -122,14 +116,14 @@ fn main() {
     // The remaining rows are the features (x_train) for the training set.
     let x_train_slice = data_train.slice(s![1..n, ..]);
     // Normalize the feature values by dividing by 255.0 to scale the values between 0 and 1.
-    let x_train = x_train_slice.to_owned() / 255.0;
+    let x_train = x_train_slice.mapv(|v| v / 255.0);
 
     // ------------------------
     // 3. Train Neural Network
     // ------------------------
     let (w1, b1, w2, b2) = gradient_descent(
         &x_train,
-        &y_train.to_owned(),
+        &y_train,
         args.iters,
         args.alpha,
         args.neurons,
@@ -142,15 +136,7 @@ fn main() {
     // ------------------------
 
     for _ in 0..args.test_prediction {
-        test_prediction(
-            random::<u8>() as usize,
-            &x_dev,
-            &y_dev.to_owned(),
-            &w1,
-            &b1,
-            &w2,
-            &b2,
-        );
+        test_prediction(random::<u8>() as usize, &x_dev, &y_dev, &w1, &b1, &w2, &b2);
     }
 }
 
@@ -239,7 +225,7 @@ fn forward_prop(
     b1: &Array2d,
     w2: &Array2d,
     b2: &Array2d,
-    x: &Array2d,
+    x: &ArrayView2<f32>,
 ) -> [Array2d; 4] {
     // Compute activations for the hidden layer:
     // \( z_1 = W_1 \cdot X + b_1 \)
@@ -264,10 +250,10 @@ fn forward_prop(
 /// # Returns
 /// Returns the one-hot encoded matrix where each column represents the one-hot encoding of the label
 /// for each sample.
-fn one_hot(y: &Array1d) -> Array2d {
+fn one_hot(y: &ArrayView1<f32>) -> Array2d {
     // Find the maximum class label to determine the number of classes
     let max = y
-        .par_iter()
+        .into_par_iter()
         .max_by(|a, b| a.partial_cmp(b).unwrap())
         .unwrap();
     let num_samples = y.len();
@@ -310,8 +296,8 @@ fn back_prop(
     // z2: Array2d, // Not used in this function but could be for the second layer's pre-activation.
     a2: &Array2d,
     w2: &Array2d,
-    x: &Array2d,
-    y: &Array1d,
+    x: &ArrayView2<f32>,
+    y: &ArrayView1<f32>,
 ) -> [Array2d; 4] {
     let m = y.len(); // The number of training examples.
 
@@ -425,7 +411,7 @@ fn get_predictions(a2: &Array2d) -> Vec<usize> {
 ///
 /// # Returns
 /// The accuracy of the model as a floating-point value between 0 and 1.
-fn get_accuracy(predictions: Vec<usize>, y: &Array1d) -> f32 {
+fn get_accuracy(predictions: Vec<usize>, y: &ArrayView1<f32>) -> f32 {
     // Count how many predictions match the true labels.
     let correct = zip(predictions, y)
         .filter(|(pred, label)| *pred as f32 == **label) // Check if predicted label equals true label.
@@ -449,7 +435,7 @@ fn get_accuracy(predictions: Vec<usize>, y: &Array1d) -> f32 {
 /// Tuple of trained parameters: \( (W_1, b_1, W_2, b_2) \)
 fn gradient_descent(
     x: &Array2d,
-    y: &Array1d,
+    y: &ArrayView1<f32>,
     iters: u32,
     alpha: f32,
     neurons: usize,
@@ -471,8 +457,8 @@ fn gradient_descent(
                 continue;
             }
 
-            let x_batch = x.slice(s![.., start..end]).to_owned();
-            let y_batch = y.slice(s![start..end]).to_owned();
+            let x_batch = x.slice(s![.., start..end]);
+            let y_batch = y.slice(s![start..end]);
 
             let (z1, a1, _z2, a2) = forward_prop(&w1, &b1, &w2, &b2, &x_batch).into();
             let (dw1, db1, dw2, db2) = back_prop(z1, &a1, &a2, &w2, &x_batch, &y_batch).into();
@@ -483,7 +469,7 @@ fn gradient_descent(
         // Optional: evaluate after each epoch (1 full pass)
         if i % 10 == 0 {
             // if true {
-            let (_, _, _, a2_full) = forward_prop(&w1, &b1, &w2, &b2, x).into();
+            let (_, _, _, a2_full) = forward_prop(&w1, &b1, &w2, &b2, &x.view()).into();
             let acc = get_accuracy(get_predictions(&a2_full), y);
             println!("Iteration {i}: Accuracy = {:.4}%", acc * 100.0);
         }
@@ -505,7 +491,7 @@ fn gradient_descent(
 /// # Returns
 /// A vector of predicted labels (indices of the highest activation values).
 fn make_predictions(
-    x: &Array2d,
+    x: &ArrayView2<f32>,
     w1: &Array2d,
     b1: &Array2d,
     w2: &Array2d,
@@ -531,22 +517,22 @@ fn make_predictions(
 fn test_prediction(
     index: usize,
     x_train: &Array2d,
-    y_train: &Array1d,
+    y_train: &ArrayView1<f32>,
     w1: &Array2d,
     b1: &Array2d,
     w2: &Array2d,
     b2: &Array2d,
 ) {
     // Get the input image at the specified index.
-    let current_image = x_train.slice(s![.., index]).to_owned();
+    let current_image = x_train.slice(s![.., index]);
 
     // Perform prediction using the trained parameters.
-    let prediction = make_predictions(&current_image.clone().insert_axis(Axis(1)), w1, b1, w2, b2);
+    let prediction = make_predictions(&current_image.insert_axis(Axis(1)), w1, b1, w2, b2);
     let label = y_train[index];
 
     // Output the predicted label and true label.
     println!("Prediction: {:?}", prediction[0]);
-    println!("Label: {:?}", label);
+    println!("Label: {label:?}");
 
     // Display the image along with the prediction and true label.
     show_image(&current_image, prediction[0], label, index);
@@ -559,7 +545,7 @@ fn test_prediction(
 /// - `prediction`: The predicted label for the image.
 /// - `label`: The true label for the image.
 /// - `index`: The index of the image sample.
-fn show_image(image: &Array1d, prediction: usize, label: f32, index: usize) {
+fn show_image(image: &ArrayView1<f32>, prediction: usize, label: f32, index: usize) {
     // Generate a file name based on prediction, label, and index.
     let file_name = format!("output-p{prediction}-l{label}-i{index}.png");
     let root = BitMapBackend::new(&file_name, (280, 280)).into_drawing_area();

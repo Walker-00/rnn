@@ -26,13 +26,15 @@ use ndarray::{Array2, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr, Z
 use plotters::prelude::*;
 use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, random, seq::SliceRandom};
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, /*IntoParallelRefIterator,*/ ParallelIterator};
+// use rayon::prelude::*;
+// use std::arch::x86_64::*;
 
 /// Alias for a 2D array of f32
 type Array2d = ArrayBase<OwnedRepr<f32>, Dim<[usize; 2]>>;
 
-/// Alias for a 1D array of f32
-// type Array1d = ArrayBase<OwnedRepr<f32>, Dim<[usize; 1]>>;
+/*/// Alias for a 1D array of f32
+// type Array1d = ArrayBase<OwnedRepr<f32>, Dim<[usize; 1]>>;*/
 
 /// Command line arguments
 #[derive(Parser, Debug)]
@@ -229,12 +231,16 @@ fn forward_prop(
 ) -> [Array2d; 4] {
     // Compute activations for the hidden layer:
     // \( z_1 = W_1 \cdot X + b_1 \)
-    let z1 = w1.dot(x) + b1; // Matrix multiplication for weights and inputs, then add biases
+    let mut z1 = w1.dot(x); // Matrix multiplication for weights and inputs, then add biases
+    z1 += b1;
+    // let z1 = fast_dot(w1, x) + b1; // Matrix multiplication for weights and inputs, then add biases
     let a1 = relu(&z1); // Apply ReLU activation to z1: \( a_1 = \text{ReLU}(z_1) \)
 
     // Compute activations for the output layer:
     // \( z_2 = W_2 \cdot a_1 + b_2 \)
-    let z2 = w2.dot(&a1) + b2; // Matrix multiplication for weights and hidden activations, then add biases
+    let mut z2 = w2.dot(&a1); // Matrix multiplication for weights and hidden activations, then add biases
+    z2 += b2;
+    // let z2 = fast_dot(w2, &a1.view()) + b2;
     let a2 = softmax(&z2); // Apply softmax activation to z2: \( a_2 = \text{Softmax}(z_2) \)
 
     // Return all intermediate results for use in backpropagation
@@ -535,7 +541,7 @@ fn test_prediction(
     println!("Label: {label:?}");
 
     // Display the image along with the prediction and true label.
-    show_image(&current_image, prediction[0], label, index);
+    // show_image(&current_image, prediction[0], label, index);
 }
 
 /// Converts the image into a visual format and saves it to a file.
@@ -573,3 +579,56 @@ fn show_image(image: &ArrayView1<f32>, prediction: usize, label: f32, index: usi
     // Output the saved image file name.
     println!("Image saved to {file_name}");
 }
+
+// /// Computes matrix multiplication (dot product) using Rayon and SIMD.
+// /// - `a`: shape (m, k)
+// /// - `b`: shape (k, n)
+// /// Returns: matrix of shape (m, n)
+// pub fn fast_dot(a: &Array2<f32>, b: &ArrayView2<f32>) -> Array2<f32> {
+//     let (m, k1) = a.dim();
+//     let (k2, n) = b.dim();
+//     assert_eq!(k1, k2, "Dimension mismatch: {m}x{k1} vs {k2}x{n}");
+//
+//     let b_t = b.t(); // Transpose b for cache-friendly access
+//     let mut result = Array2::<f32>::zeros((m, n));
+//
+//     result
+//         .outer_iter_mut()
+//         .into_par_iter()
+//         .enumerate()
+//         .for_each(|(i, mut row)| {
+//             for j in 0..n {
+//                 let mut sum = 0.0;
+//                 let mut k = 0;
+//
+//                 // SIMD: use 128-bit (4 x f32) if available
+//                 unsafe {
+//                     if is_x86_feature_detected!("sse") {
+//                         let mut vsum = _mm_setzero_ps();
+//
+//                         while k + 4 <= k1 {
+//                             let va = _mm_loadu_ps(a.row(i).slice(s![k..k + 4]).as_ptr());
+//                             let vb = _mm_loadu_ps(b_t.row(j).slice(s![k..k + 4]).as_ptr());
+//                             let prod = _mm_mul_ps(va, vb);
+//                             vsum = _mm_add_ps(vsum, prod);
+//                             k += 4;
+//                         }
+//
+//                         let mut temp = [0.0f32; 4];
+//                         _mm_storeu_ps(temp.as_mut_ptr(), vsum);
+//                         sum += temp.iter().sum::<f32>();
+//                     }
+//                 }
+//
+//                 // Fallback for remaining elements
+//                 while k < k1 {
+//                     sum += a[[i, k]] * b[[k, j]];
+//                     k += 1;
+//                 }
+//
+//                 row[j] = sum;
+//             }
+//         });
+//
+//     result
+// }

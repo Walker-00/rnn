@@ -60,6 +60,10 @@ struct Args {
     /// Recommended: 76 or higher
     #[arg(short, long)]
     batch_size: usize,
+
+    /// Global Parallel thread
+    #[arg(short, long)]
+    thread: usize,
 }
 
 /// Entry point: loads MNIST data, trains a neural network using gradient descent,
@@ -72,6 +76,11 @@ fn main() {
 
     // Initialize random number generator
     let mut rng = rand::rng();
+
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(args.thread)
+        .build_global()
+        .unwrap();
 
     // ------------------------
     // 2. Load and Preprocess Data

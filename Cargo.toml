@@ -2,6 +2,7 @@
 name = "rnn"
 version = "0.1.0"
 edition = "2024"
+build = "build.rs"
 
 [profile.release]
 strip = true
@@ -14,8 +15,8 @@ clap = { version = "4.5.36", features = ["derive"] }
 csv = "1.3.1"
 faer = "0.22.6"
 faer-ext = { version = "0.6.0", features = ["polars"] }
-ndarray = { version = "0.16.1", features = ["rayon"] }
-# ndarray-linalg = { version = "0.17.0", features = ["openblas-system"] }
+ndarray = { version = "0.16.1", features = ["rayon", "blas"] }
+ndarray-linalg = { version = "0.17.0", features = ["openblas-system"] }
 ndarray-parallel = "0.9.1"
 ndarray-rand = "0.15.0"
 ndarray-stats = "0.6.0"
@@ -32,6 +33,7 @@ wide = "0.7.32"
 # intel-mkl-src = { version = "0.8", features = ["mkl-static-lp64-iomp"], optional = true }
 anyhow = "1.0.98"
 thiserror = "2.0.12"
+# ndarray-linalg = { version = "0.17.0", features = ["openblas"] }
 
 
 [dev-dependencies]

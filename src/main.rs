@@ -22,7 +22,9 @@
 use std::iter::zip;
 
 use clap::Parser;
-use ndarray::{Array2, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr, Zip, s};
+use ndarray::{
+    Array2, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr, Zip, s,
+};
 use plotters::prelude::*;
 use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, random, seq::SliceRandom};

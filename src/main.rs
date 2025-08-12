@@ -22,14 +22,16 @@
 use std::iter::zip;
 
 use clap::Parser;
-use ndarray::{
-    Array2, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr, Zip, s,
-};
+use ndarray::{Array2, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr, Zip, s};
 use plotters::prelude::*;
 use polars::{io::SerReader, prelude::*};
 use rand::{Rng, distr::Uniform, random, seq::SliceRandom};
-use rayon::iter::{IntoParallelIterator, /*IntoParallelRefIterator,*/ ParallelIterator};
-// use rayon::prelude::*;
+use rayon::prelude::*;
+use rayon::{
+    iter::{IntoParallelIterator, /*IntoParallelRefIterator,*/ ParallelIterator},
+    slice::ParallelSliceMut,
+};
+use std::arch::x86_64::*;
 // use std::arch::x86_64::*;
 
 /// Alias for a 2D array of f32
@@ -190,6 +192,70 @@ fn relu(z: &Array2d) -> Array2d {
     z
 }
 
+fn relu_simd(z: &Array2d) -> Array2d {
+    let mut z = z.clone();
+
+    // SAFETY: We'll use AVX2 intrinsics, so CPU must support it.
+    assert!(is_x86_feature_detected!("avx2"));
+
+    // Process data as a flat slice to simplify SIMD processing.
+    let data = z.as_slice_mut().unwrap();
+
+    // Number of f32 per __m256 register (AVX2 256-bit = 8 f32)
+    const LANES: usize = 8;
+
+    // Zero vector to compare against
+    unsafe {
+        let zero_vec = _mm256_setzero_ps();
+
+        // Process in parallel by chunks of LANES
+        data.par_chunks_mut(LANES).for_each(|chunk| {
+            let len = chunk.len();
+
+            if len == LANES {
+                // Load 8 floats
+                let ptr = chunk.as_ptr();
+                let mut values = _mm256_loadu_ps(ptr);
+
+                // max(values, 0.0)
+                values = _mm256_max_ps(values, zero_vec);
+
+                // Store back
+                _mm256_storeu_ps(chunk.as_mut_ptr(), values);
+            } else {
+                // For tail elements (< 8), do scalar fallback
+                for v in chunk.iter_mut() {
+                    *v = v.max(0.0);
+                }
+            }
+        });
+    }
+
+    z
+}
+
+#[inline]
+fn simd_relu(z: &mut [f32]) {
+    let len = z.len();
+    let mut i = 0;
+
+    // Process using 128-bit SIMD (4 floats at a time)
+    unsafe {
+        let zero = _mm_setzero_ps();
+        while i + 4 <= len {
+            let mut v = _mm_loadu_ps(z.get_unchecked(i));
+            v = _mm_max_ps(v, zero);
+            _mm_storeu_ps(z.get_unchecked_mut(i) as *mut f32, v);
+            i += 4;
+        }
+    }
+
+    // Process remaining elements
+    for j in i..len {
+        z[j] = z[j].max(0.0);
+    }
+}
+
 /// Computes the derivative of ReLU for backpropagation.
 ///
 /// \[ \text{ReLU}'(x) = \begin{cases} 1 & x > 0 \\ 0 & x \leq 0 \end{cases} \]
@@ -245,7 +311,7 @@ fn forward_prop(
     let mut z1 = w1.dot(x); // Matrix multiplication for weights and inputs, then add biases
     z1 += b1;
     // let z1 = fast_dot(w1, x) + b1; // Matrix multiplication for weights and inputs, then add biases
-    let a1 = relu(&z1); // Apply ReLU activation to z1: \( a_1 = \text{ReLU}(z_1) \)
+    let a1 = relu_simd(&z1); // Apply ReLU activation to z1: \( a_1 = \text{ReLU}(z_1) \)
 
     // Compute activations for the output layer:
     // \( z_2 = W_2 \cdot a_1 + b_2 \)
